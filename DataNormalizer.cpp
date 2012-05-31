@@ -27,12 +27,6 @@ DataNormalizer::DataNormalizer(byte aAnalogueInputPinNumber, byte aNumberOfArray
   Init();
 }
 
-bool DataNormalizer::CalculateSlopArray(float* aResults)
-{
-  for(int i=0; i < _Count; i++)
-    aResults[i] = 1.0 * abs(_Normalized[i+1] - _Normalized[i]) / (_Segments[i+1] - _Segments[i]);
-}
-
 int DataNormalizer::Compensate(int aValue)
 {
   char lIndex = FindPosition(aValue);

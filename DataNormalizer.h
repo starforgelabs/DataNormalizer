@@ -94,22 +94,6 @@ class DataNormalizer
     DataNormalizer(byte aAnalogueInputPinNumber, byte aNumberOfArrayElements, int* aSegmentArray, int* aNormalizedArray);
 
     //
-    // Populate an array of normal:raw values, where each element corresponds 
-    // to the (raw, normal) tuples used to initialize the object.
-    // This represents the number of normal units per raw value. 
-    //
-    // The values correspond to the segments from i to i+1, so the last element
-    // will be empty.
-    //
-    // If the ratio is "small", then noise in the input will correspond to 
-    // little to no movement in normalized value. 
-    //
-    // If the ratio is "big", then noise in the input will correspond to 
-    // (potentially large) jitter in the normalized values.
-    //
-    bool CalculateSlopArray(float* aResults);
-
-    //
     // Read the analog pin, store the value in RawValue, perform the 
     // normalization, and store its value in Value.
     //
