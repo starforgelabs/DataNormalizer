@@ -18,20 +18,17 @@
 
 #include "Arduino.h"
 
-// This is part of an Arduino library. 
-
 //
 // SUMMARY
 //
-// This class reads an analogue data pin and converts the raw number 
-// to a normalized value.
+// This class reads one or more analogue data pins and converts 
+// the raw numbers to normalized values.
 //
 // PURPOSE
 //
-// It attempts to address the problem of synchronizing multiple sensors
-// so that (ideally) for a given external quantity, the same number 
-// can be obtained for each of the sensors even though the sensors may
-// not return identical raw values themselves.
+// It attempts to address the problem of using multiple sensors
+// so that they'll return the same value for a given physical 
+// quantity. 
 //
 // USE
 //
@@ -39,105 +36,187 @@
 // calibration measurements can be made to break up the curve into 
 // linear segments. 
 //
-// This class requires two tables, representing tuples of 
-// (raw value, normalized value). 
-// The tuples bust be sorted by ascending raw values.
+// This class requires n-tuples of calibration data which consist
+// of the raw values captured by the Arduino, and the corresponding
+// normalized value for the event. 
+//
+// The tuples must be sorted by ascending raw values.
 // The normalized value may be in ascending or descending order.
 //
 // The raw value is matched to the correct segment, and a linear 
-// interpolation is performed on that segment. 
+// interpolation is performed to get the normalized value.
 // 
-// Normally the same array representing normalized values will be 
-// shared among sensors. 
-//
 // EXAMPLE
 //
-// In this example, Aperture contains the normalized values, specifically
-// an aperture value multiplied by ten (150=15.0, 124=12.4, etc.).
+// In this example, four light sensors are read, and their values
+// reported as f/stop values.
 //
-// Data1, Data2, etc. represent the raw values coming off of the Arduino 
-// analogue pins that correspond to the aperture values.
+// The "Pins" array contains the Arduino pins to use. This also defines the 
+// meaning for the Readings and Normalized class memers. 
+// * Pin 5 will be sensor index 0.
+// * Pin 4 will be sensor index 1.
+// * Pin 3 will be sensor index 2.
+// * Pin 2 will be sensor index 3.
 //
-// int Aperture[DATA_COUNT] = {150, 124, 114, 106, 98, 88, 76, 64, 59, 55, 49, 44, 39, 32, 13, -9 };
-// int Data1[DATA_COUNT] = { 5, 9, 16, 24, 30, 47, 88, 127, 161, 180, 213, 284, 376, 499, 713, 959 };
-// int Data2[DATA_COUNT] = { 7, 18, 27, 39, 47, 73, 141, 196, 228, 256, 309, 379, 483, 616, 803, 981 };
-// int Data3[DATA_COUNT] = { 5, 16, 24, 33, 43, 66, 132, 177, 220, 253, 289, 385, 465, 600, 813, 980 };
-// int Data4[DATA_COUNT] = { 7, 14, 23, 32, 42, 65, 123, 168, 213, 241, 274, 371, 450, 575, 789, 970 };
+// The Aperture array contains the f/stop values obtained during
+// calibration. They are multiplied by ten (150=15.0, 124=12.4, etc.).
+//
+// Data0, Data1, etc. represent the raw sensor values coming off of the Arduino 
+// that correspond to the f/stop values. 
+//
+// The array of vectors CalibrationVectors is required for initializing the class.
+//
+// const byte SENSOR_COUNT = 4;
+// byte Pins[SENSOR_COUNT] = {5, 4, 3, 2};
+//
+// const byte VECTOR_SIZE = 16;
+// int Aperture[VECTOR_SIZE] = {150, 124, 114, 106, 98, 88,  76,  64,  59,  55,  49,  44,  39,  32,  13,  -9 };
+// int Data0[VECTOR_SIZE]    = {  5,   9,  16,  24, 30, 47,  88, 127, 161, 180, 213, 284, 376, 499, 713, 959 };
+// int Data1[VECTOR_SIZE]    = {  7,  18,  27,  39, 47, 73, 141, 196, 228, 256, 309, 379, 483, 616, 803, 981 };
+// int Data2[VECTOR_SIZE]    = {  5,  16,  24,  33, 43, 66, 132, 177, 220, 253, 289, 385, 465, 600, 813, 980 };
+// int Data3[VECTOR_SIZE]    = {  7,  14,  23,  32, 42, 65, 123, 168, 213, 241, 274, 371, 450, 575, 789, 970 };
+//
+// int CalibrationVectors[SENSOR_COUNT] = {Data0, Data1, Data2, Data3};
 // 
-// DataNormalizer Sensor1(5, DATA_COUNT, Data1, Aperture);
-// DataNormalizer Sensor2(4, DATA_COUNT, Data2, Aperture);
-// DataNormalizer Sensor3(3, DATA_COUNT, Data3, Aperture);
-// DataNormalizer Sensor4(2, DATA_COUNT, Data4, Aperture);
+// DataNormalizer Sensors(SENSOR_COUNT, Pins, VECTOR_SIZE, CalibrationVectors, Aperture);
 //
 
-
-// The following are status codes returned by StatusCode();
-// S = success
-// F = failure
-const byte S_OK                     =  0;
-const byte F_NOT_INITIALIZED        =  1;
-const byte F_SEGMENTS_NOT_ASCENDING =  2;
-const byte F_NOT_ENOUGH_DATA        =  3;
 
 const int SEGMENT_INDEX_LOW         = -1;
 const int SEGMENT_INDEX_HIGH        = -2;
 
+// The maximum number of analogue inputs on the Adruino Uno.
+const int MAX_NUM_ANALOGUE_INPUTS   =  6;
+
 class DataNormalizer 
 {
   public:
+    // The following are status codes returned by StatusCode();
+    // S = success
+    // F = failure
+    enum ErrorCodes 
+    {
+      S_OK, 
+      F_Uninitialized,
+      F_BadNumberOfSensors,
+      F_NoSensorList,
+      F_BadPinNumber,
+      F_BadVectorSize,
+      F_MissingCalibrationVector,
+      F_MissingNormalizedVector
+    };
+
+  public:
     //
-    // aAnalogueInputPinNumber - the analogue pin number to read
-    // aArrayElements          - the number of entries in the conversion tables
-    // aSegmentArray           - an ascending array of raw values
-    // aNormalizedArray        - an array of normalized values
+    // aNumberOfSensors    - the number of sensors this object will track
+    // aSensorsToUse       - a list of Arduino analogue pin numbers to use
+    //                     - This will determine the meaning of the indices
+    //                       in the Readings and Normalized arrays. 
+    //                       This will allow the user to work with the concept
+    //                       of "sensor 0", "sensor 1", "sensor 2", etc. without
+    //                       needing to track the actual pin numbers through 
+    //                       the code, and allow the user to iterate through the 
+    //                       arrays with a for loop.
+    // aVectorSize         - The number of elements in the calibration vectors 
+    //                       and the normalized vector. 
+    // aCalibrationVectors - An array of vectors that contain calibration data 
+    //                       for each of the sensors.
+    // aNormalizedVector   - A vector of values for the normalized portion of 
+    //                       the calibration data.
     //
-    DataNormalizer(byte aAnalogueInputPinNumber, byte aNumberOfArrayElements, int* aSegmentArray, int* aNormalizedArray);
+    DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
+                   const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
+    DataNormalizer(int foo);
 
     //
-    // Read the analog pin, store the value in RawValue, perform the 
-    // normalization, and store its value in Value.
+    // Contains the latest readings from the sensors. 
+    //
+    // Note that the indices run from 0..SensorCount()-1, and correspond to 
+    // the pin numbers used to initialize the class.
+    //
+    // In practice they shouldn't be modified, but for diagnostic purposes
+    // one may populate this array then call Calibrate(). 
+    //
+    int Readings[MAX_NUM_ANALOGUE_INPUTS];
+
+    //
+    // Contains the normalized sensor readings.
+    //
+    // Note that the indices run from 0..SensorCount()-1, and correspond to 
+    // the pin numbers used to initialize the class.
+    //
+    // These should not be modified.
+    //
+    int Normalized[MAX_NUM_ANALOGUE_INPUTS];
+
+    //
+    // Gets the index number of a pin number.
+    //
+    // It will return a non-negative index number upon success, 
+    // or -1 upon failure. 
+    //
+    byte IndexOf(byte aPinNumber);
+
+    //
+    // Perform the normalization on all the sensor readings.
+    //
+    // Returns a boolean indicating success.
+    //
+    bool Normalize();
+
+    //
+    // Populate the Readings array with values from the analog pins.
+    //
+    // Returns a boolean indicating success.
     //
     bool Read();
 
-    // Return the raw value read from the analogue input pin.
-    int RawValue();
+    //
+    // As advertized; calls Read() and Normalize() if there are no errors.
+    //
+    // Returns a boolean indicating success.
+    //
+    bool ReadAndNormalize();
 
-    // Instead of reading the current value from the analogue pin and 
-    // normalizing, perform the process with a specific value.
-    bool setRawValue(int aValue);
+    byte SensorCount();
 
-    // Return the lower index of the segment that the raw value falls in.
-    // SEGMENT_INDEX_LOW means that the raw value falls below the lowest segment range.
-    // SEGMENT_INDEX_HIGH means that the raw value falls above the highest segment range.
-    int Segment();
-    
     // Return the status of the object per the status codes above.
-    byte StatusCode();
+    ErrorCodes StatusCode();
 
-    // Return the normalized value.
-    int Value();
-  
   private:
     // Perform compensation.
-    int Compensate(int aValue);
+    int Compensate(int aValue, const int* aVector, int* aIndex);
 
     // Find the correct segment to use for interpolation.
-    char FindPosition(int aValue);
+    char FindPosition(int aValue, const int* aVector);
 
     // Ensure that the data presented to the constructor makes sense,
     // and set the status code appropriately.
-    void Init();
+    void Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
+              const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
     
-    byte _Pin;
+    byte _Pins[MAX_NUM_ANALOGUE_INPUTS];
 
-    byte _Count;
-    int* _Normalized;
-    int* _Segments;
+    // This is the number of sensors.
+    byte _SensorCount;
+    
+    // This is the number of elements in the calibration vectors.
+    byte _VectorSize;
 
-    int  _RawValue;
-    byte _StatusCode;
-    int  _Segment;
-    int  _Value;
+    // This is the vector of normalized values.
+    const int* _NormalizedVector;
+
+    // This is the array that contains _SensorCount calibration row vectors.
+    const int* _CalibrationVectors[];
+
+    // Last error code.
+    ErrorCodes _StatusCode;
+
+    // Contains the lower index of the segment that the readings falls in.
+    // SEGMENT_INDEX_LOW means that the reading falls below the lowest segment range.
+    // SEGMENT_INDEX_HIGH means that the reading falls above the highest segment range.
+    int _SegmentBases[MAX_NUM_ANALOGUE_INPUTS];
+
 };
 
 #endif // DATA_NORMALIZER_H
