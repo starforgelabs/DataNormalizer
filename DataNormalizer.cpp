@@ -1,5 +1,5 @@
 /*
- *  DataNormalizer.h
+ *  DataNormalizer.cpp
  *  Sun Tracker
  *
  *  Created by 治永夢守 on 12/05/27.
@@ -15,82 +15,130 @@
 
 #include "DataNormalizer.h"
 
-DataNormalizer::DataNormalizer(byte aAnalogueInputPinNumber, byte aNumberOfArrayElements, int* aSegmentArray, int* aNormalizedArray)
+DataNormalizer::DataNormalizer(int foo)
 {
-  _StatusCode = F_NOT_INITIALIZED;
-
-  _Pin = aAnalogueInputPinNumber;
-  _Count = aNumberOfArrayElements-1;
-  _Segments = aSegmentArray;
-  _Normalized = aNormalizedArray;
-  
-  Init();
+  _StatusCode = F_Uninitialized;
 }
 
-bool DataNormalizer::CalculateSlopArray(float* aResults)
+DataNormalizer::DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
+                               const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {
-  for(int i=0; i < _Count; i++)
-    aResults[i] = 1.0 * abs(_Normalized[i+1] - _Normalized[i]) / (_Segments[i+1] - _Segments[i]);
+  Init(aNumberOfSensors, aSensorsToUse, aVectorSize, aCalibrationVectors, aNormalizedVector);
 }
 
-int DataNormalizer::Compensate(int aValue)
+//
+// Normalize the data for a particular reading.
+//
+// aValue - The reading.
+// aVector - The vector of readings to use.
+// aIndex - Where to cache the index for aVector.
+//
+int DataNormalizer::Compensate(int aValue, const int* aVector, int* aIndex)
 {
-  char lIndex = FindPosition(aValue);
+  *aIndex = FindPosition(aValue, aVector);
 
-  if(lIndex < 0)
+  if(*aIndex < 0)
   {
-    _Segment = SEGMENT_INDEX_LOW;
-    return _Normalized[0];
+    *aIndex = SEGMENT_INDEX_LOW;
+    return _NormalizedVector[0];
   }
-  else if(lIndex >= _Count)
+  else if(*aIndex >= _VectorSize)
   {
-    _Segment = SEGMENT_INDEX_HIGH;
-    return _Normalized[_Count];
+    *aIndex = SEGMENT_INDEX_HIGH;
+    return _NormalizedVector[_VectorSize];
   }
-  else
-    _Segment = lIndex;
   
-  return map(aValue, _Segments[lIndex], _Segments[lIndex+1], _Normalized[lIndex], _Normalized[lIndex+1]);
+  return map(aValue, aVector[*aIndex], aVector[*aIndex+1], _NormalizedVector[*aIndex], _NormalizedVector[*aIndex+1]);
 }
 
 //
 // Finds which segment the raw value lies in.
 //
-// < 0         - Below the segment values. 
-// 0.._Count-1 - the segment index
-// >= _Count   - the value lies above the segment values.
+// < 0              - Below the segment values. 
+// 0.._VectorSize-1 - the segment index
+// >= _VectorSize   - the value lies above the segment values.
 //
-char DataNormalizer::FindPosition(int aValue)
+char DataNormalizer::FindPosition(int aValue, const int* aVector)
 {
   byte i;
-  for(i=0; i<=_Count; i++)
-    if(aValue <= _Segments[i])
+  for(i=0; i<=_VectorSize; i++)
+    if(aValue <= aVector[i])
       return i-1;
   
-  return _Count;
+  return _VectorSize;
 }
 
-void DataNormalizer::Init()
+void DataNormalizer::Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
+                          const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {
-  if (_Count < 1) 
+  //
+  // Validate incoming data.
+  //
+  if(aNumberOfSensors < 0 || aNumberOfSensors > MAX_NUM_ANALOGUE_INPUTS)
   {
-    _StatusCode = F_NOT_ENOUGH_DATA;
+    _StatusCode = F_BadNumberOfSensors;
     return;
   }
-  
-  for (int i=0 ; i< _Count ; i++) 
-    if (_Segments[i] >= _Segments[i+1]) 
+
+  if(aSensorsToUse == NULL)
+  {
+    _StatusCode = F_NoSensorList;
+    return;
+  }
+
+  for(int i=0; i<aNumberOfSensors; i++)
+    if(aSensorsToUse[i] < 0 || aSensorsToUse[i] >= MAX_NUM_ANALOGUE_INPUTS)
     {
-      _StatusCode = F_SEGMENTS_NOT_ASCENDING;
+      _StatusCode = F_BadPinNumber;
       return;
     }
+
+  if(aVectorSize < 2)
+  {
+    _StatusCode = F_BadVectorSize;
+    return;
+  }
+
+  for(int i=0; i<aVectorSize; i++)
+    if(aCalibrationVectors[i] == NULL)
+    {
+      _StatusCode = F_MissingCalibrationVector;
+      return;
+    }
+
+  if(aNormalizedVector == NULL)
+  {
+    _StatusCode = F_MissingNormalizedVector;
+    return;
+  }
+
+  // 
+  // Copy validated data to their storage locations.
+  //
+  _SensorCount  = aNumberOfSensors;
+  _VectorSize = aVectorSize;
+
+  for(int i=0; i<_SensorCount; i++)
+    _Pins[i] = aSensorsToUse[i];
+
+  for(int i=0; i<_SensorCount; i++)
+    _CalibrationVectors[i] = aCalibrationVectors[i];
+
+  _NormalizedVector = aNormalizedVector; 
 
   _StatusCode = S_OK;
 }
 
-int DataNormalizer::RawValue()
+bool DataNormalizer::Normalize()
 {
-  return _RawValue;
+  if (_StatusCode != S_OK) 
+    return false;
+
+  for(int i=0; i<_SensorCount; i++)
+    Normalized[i] = Compensate(Readings[i], _CalibrationVectors[i], &_SegmentBases[i]);
+
+  return true;
+
 }
 
 bool DataNormalizer::Read()
@@ -98,28 +146,22 @@ bool DataNormalizer::Read()
   if (_StatusCode != S_OK) 
     return false;
 
-  _RawValue = analogRead(_Pin);
-  _Value = Compensate(_RawValue);
+  for(int i=0; i<_SensorCount; i++)
+    Readings[i] = analogRead(_Pins[i]);
+
   return true;
 }
 
-bool DataNormalizer::setRawValue(int aValue)
+bool DataNormalizer::ReadAndNormalize()
 {
-  if (_StatusCode != S_OK) 
+  if(!Read())
     return false;
 
-  _RawValue = aValue;
-  _Value = Compensate(_RawValue);
-  return true;
+  return Normalize();
 }
 
-byte DataNormalizer::StatusCode()
+DataNormalizer::ErrorCodes DataNormalizer::StatusCode()
 {
   return _StatusCode;
-}
-
-int DataNormalizer::Value()
-{
-  return _Value;
 }
 
