@@ -15,11 +15,6 @@
 
 #include "DataNormalizer.h"
 
-DataNormalizer::DataNormalizer(int foo)
-{
-  _StatusCode = F_Uninitialized;
-}
-
 DataNormalizer::DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                                const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {

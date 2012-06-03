@@ -126,7 +126,6 @@ class DataNormalizer
     //
     DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                    const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
-    DataNormalizer(int foo);
 
     //
     // Contains the latest readings from the sensors. 
