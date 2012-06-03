@@ -206,7 +206,7 @@ class DataNormalizer
     const int* _NormalizedVector;
 
     // This is the array that contains _SensorCount calibration row vectors.
-    const int* _CalibrationVectors[];
+    const int* _CalibrationVectors[MAX_NUM_ANALOGUE_INPUTS];
 
     // Last error code.
     ErrorCodes _StatusCode;
