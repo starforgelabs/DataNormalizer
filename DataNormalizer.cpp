@@ -18,7 +18,16 @@
 DataNormalizer::DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                                const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {
-  Init(aNumberOfSensors, aSensorsToUse, aVectorSize, aCalibrationVectors, aNormalizedVector);
+  _IOwnInputs = false;
+  if(Init(aNumberOfSensors, aSensorsToUse, aVectorSize, aCalibrationVectors, aNormalizedVector))
+    InitInputs();
+}
+
+DataNormalizer::~DataNormalizer()
+{
+  if(_IOwnInputs)
+    for(int i=0; i<_SensorCount; i++)
+      delete _Inputs[i];
 }
 
 //
@@ -63,7 +72,7 @@ char DataNormalizer::FindPosition(int aValue, const int* aVector)
   return _VectorSize;
 }
 
-void DataNormalizer::Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
+bool DataNormalizer::Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                           const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {
   //
@@ -72,39 +81,39 @@ void DataNormalizer::Init(const byte aNumberOfSensors, const byte* aSensorsToUse
   if(aNumberOfSensors < 0 || aNumberOfSensors > MAX_NUM_ANALOGUE_INPUTS)
   {
     _StatusCode = F_BadNumberOfSensors;
-    return;
+    return false;
   }
 
   if(aSensorsToUse == NULL)
   {
     _StatusCode = F_NoSensorList;
-    return;
+    return false;
   }
 
   for(int i=0; i<aNumberOfSensors; i++)
     if(aSensorsToUse[i] < 0 || aSensorsToUse[i] >= MAX_NUM_ANALOGUE_INPUTS)
     {
       _StatusCode = F_BadPinNumber;
-      return;
+      return false;
     }
 
   if(aVectorSize < 2)
   {
     _StatusCode = F_BadVectorSize;
-    return;
+    return false;
   }
 
   for(int i=0; i<aVectorSize; i++)
     if(aCalibrationVectors[i] == NULL)
     {
       _StatusCode = F_MissingCalibrationVector;
-      return;
+      return false;
     }
 
   if(aNormalizedVector == NULL)
   {
     _StatusCode = F_MissingNormalizedVector;
-    return;
+    return false;
   }
 
   // 
@@ -122,6 +131,19 @@ void DataNormalizer::Init(const byte aNumberOfSensors, const byte* aSensorsToUse
   _NormalizedVector = aNormalizedVector; 
 
   _StatusCode = S_OK;
+  return true;
+}
+
+bool DataNormalizer::InitInputs()
+{
+  //
+  // Initialize the sensor readers.
+  //
+  _IOwnInputs = true;
+  for(int i=0; i<_SensorCount; i++)
+    _Inputs[i] = new BaseAnalogRead(_Pins[i]);
+
+  return true;
 }
 
 bool DataNormalizer::Normalize()
@@ -142,7 +164,7 @@ bool DataNormalizer::Read()
     return false;
 
   for(int i=0; i<_SensorCount; i++)
-    Readings[i] = analogRead(_Pins[i]);
+    Readings[i] = _Inputs[i]->Read();
 
   return true;
 }

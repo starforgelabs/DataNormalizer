@@ -17,6 +17,7 @@
 #define DATA_NORMALIZER_H
 
 #include "Arduino.h"
+#include <BaseAnalogRead.h>
 
 //
 // SUMMARY
@@ -126,6 +127,7 @@ class DataNormalizer
     //
     DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                    const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
+    ~DataNormalizer();
 
     //
     // Contains the latest readings from the sensors. 
@@ -191,8 +193,14 @@ class DataNormalizer
 
     // Ensure that the data presented to the constructor makes sense,
     // and set the status code appropriately.
-    void Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
+    bool Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
               const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
+
+    bool InitInputs();
+
+    BaseAnalogRead* _Inputs[MAX_NUM_ANALOGUE_INPUTS];
+
+    bool _IOwnInputs;
     
     byte _Pins[MAX_NUM_ANALOGUE_INPUTS];
 
