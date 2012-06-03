@@ -18,16 +18,12 @@
 DataNormalizer::DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                                const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {
-  _IOwnInputs = false;
   if(Init(aNumberOfSensors, aSensorsToUse, aVectorSize, aCalibrationVectors, aNormalizedVector))
     InitInputs();
 }
 
 DataNormalizer::~DataNormalizer()
 {
-  if(_IOwnInputs)
-    for(int i=0; i<_SensorCount; i++)
-      delete _Inputs[i];
 }
 
 //
@@ -75,6 +71,13 @@ char DataNormalizer::FindPosition(int aValue, const int* aVector)
 bool DataNormalizer::Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                           const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {
+  //
+  // Initialize values.
+  //
+  _IOwnInputs = false;
+  for(int i=0; i<MAX_NUM_ANALOGUE_INPUTS; i++)
+    _Inputs[i] = NULL;
+
   //
   // Validate incoming data.
   //
@@ -164,7 +167,10 @@ bool DataNormalizer::Read()
     return false;
 
   for(int i=0; i<_SensorCount; i++)
-    Readings[i] = _Inputs[i]->Read();
+    if(_Inputs[i] == NULL)
+      Readings[i] = analogRead(_Pins[i]);
+    else
+      Readings[i] = _Inputs[i]->Read();
 
   return true;
 }
@@ -175,6 +181,19 @@ bool DataNormalizer::ReadAndNormalize()
     return false;
 
   return Normalize();
+}
+
+bool DataNormalizer::setInputs(BaseAnalogRead* aInputs[])
+{
+  if (_StatusCode != S_OK) 
+    return false;
+
+  for(int i=0; i<_SensorCount; i++)
+  {
+    _Inputs[i] = aInputs[i];
+    if(_Inputs[i])
+      _Inputs[i]->setPinNumber(_Pins[i]);
+  }
 }
 
 DataNormalizer::ErrorCodes DataNormalizer::StatusCode()
