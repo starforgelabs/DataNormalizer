@@ -10,6 +10,8 @@
 //
 // https://creativecommons.org/licenses/by-sa/3.0/
 //
+// This code is strictly "as is". Use at your own risk. 
+//
 //
 //
 
@@ -17,6 +19,7 @@
 #define DATA_NORMALIZER_H
 
 #include "Arduino.h"
+#include <BaseAnalogRead.h>
 
 //
 // SUMMARY
@@ -52,7 +55,7 @@
 // reported as f/stop values.
 //
 // The "Pins" array contains the Arduino pins to use. This also defines the 
-// meaning for the Readings and Normalized class memers. 
+// meaning for the Values and Normalized class memers. 
 // * Pin 5 will be sensor index 0.
 // * Pin 4 will be sensor index 1.
 // * Pin 3 will be sensor index 2.
@@ -111,7 +114,7 @@ class DataNormalizer
     // aNumberOfSensors    - the number of sensors this object will track
     // aSensorsToUse       - a list of Arduino analogue pin numbers to use
     //                     - This will determine the meaning of the indices
-    //                       in the Readings and Normalized arrays. 
+    //                       in the Values and Normalized arrays. 
     //                       This will allow the user to work with the concept
     //                       of "sensor 0", "sensor 1", "sensor 2", etc. without
     //                       needing to track the actual pin numbers through 
@@ -126,6 +129,7 @@ class DataNormalizer
     //
     DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                    const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
+    ~DataNormalizer();
 
     //
     // Contains the latest readings from the sensors. 
@@ -136,7 +140,7 @@ class DataNormalizer
     // In practice they shouldn't be modified, but for diagnostic purposes
     // one may populate this array then call Calibrate(). 
     //
-    int Readings[MAX_NUM_ANALOGUE_INPUTS];
+    int Values[MAX_NUM_ANALOGUE_INPUTS];
 
     //
     // Contains the normalized sensor readings.
@@ -164,7 +168,7 @@ class DataNormalizer
     bool Normalize();
 
     //
-    // Populate the Readings array with values from the analog pins.
+    // Populate the Values array with values from the analog pins.
     //
     // Returns a boolean indicating success.
     //
@@ -179,6 +183,8 @@ class DataNormalizer
 
     byte SensorCount();
 
+    bool setInputs(BaseAnalogRead* aInputs[]);
+
     // Return the status of the object per the status codes above.
     ErrorCodes StatusCode();
 
@@ -191,8 +197,14 @@ class DataNormalizer
 
     // Ensure that the data presented to the constructor makes sense,
     // and set the status code appropriately.
-    void Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
+    bool Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
               const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
+
+    bool InitInputs();
+
+    BaseAnalogRead* _Inputs[MAX_NUM_ANALOGUE_INPUTS];
+
+    bool _IOwnInputs;
     
     byte _Pins[MAX_NUM_ANALOGUE_INPUTS];
 
