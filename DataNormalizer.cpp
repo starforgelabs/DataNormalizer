@@ -10,6 +10,8 @@
  *
  * https://creativecommons.org/licenses/by-sa/3.0/
  *
+ * This code is strictly "as is". Use at your own risk. 
+ *
  *
  */
 
@@ -155,7 +157,7 @@ bool DataNormalizer::Normalize()
     return false;
 
   for(int i=0; i<_SensorCount; i++)
-    Normalized[i] = Compensate(Readings[i], _CalibrationVectors[i], &_SegmentBases[i]);
+    Normalized[i] = Compensate(Values[i], _CalibrationVectors[i], &_SegmentBases[i]);
 
   return true;
 
@@ -168,9 +170,9 @@ bool DataNormalizer::Read()
 
   for(int i=0; i<_SensorCount; i++)
     if(_Inputs[i] == NULL)
-      Readings[i] = analogRead(_Pins[i]);
+      Values[i] = analogRead(_Pins[i]);
     else
-      Readings[i] = _Inputs[i]->Read();
+      Values[i] = _Inputs[i]->Read();
 
   return true;
 }
