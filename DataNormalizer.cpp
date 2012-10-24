@@ -70,6 +70,15 @@ char DataNormalizer::FindPosition(int aValue, const int* aVector)
   return _VectorSize;
 }
 
+byte DataNormalizer::IndexOf(byte aPinNumber)
+{
+  for(int i=0; i<_SensorCount; i++)
+    if(_Pins[i] == aPinNumber)
+      return i;
+
+  return -1;
+}
+
 bool DataNormalizer::Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
                           const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector)
 {
