@@ -42,34 +42,6 @@ int DataNormalizer::Compensate(int aValue, const int* aVector, int* aIndex)
   return map(aValue, aVector[*aIndex], aVector[*aIndex+1], _NormalizedVector[*aIndex], _NormalizedVector[*aIndex+1]);
 }
 
-//
-// Finds which segment the raw value lies in.
-//
-// < 0              - Below the segment values. 
-// 0.._VectorSize-1 - the segment index
-// >= _VectorSize   - the value lies above the segment values.
-//
-char DataNormalizer::FindPosition(int aValue, const int* aVector)
-{
-  byte i;
-  for(i=0; i<=_VectorSize; i++)
-    if(aValue <= aVector[i])
-      return i-1;
-  
-  return _VectorSize;
-}
-
-byte DataNormalizer::IndexOf(byte aPinNumber)
-{
-  if(_StatusCode != S_OK) return -1;
-
-  for(int i=0; i<_SensorCount; i++)
-    if(_Inputs[i]->PinNumber() == aPinNumber)
-      return i;
-
-  return -1;
-}
-
 bool DataNormalizer::configure(const byte aNumberOfSensors, BaseAnalogRead* aSensorReaders[], 
                                const byte aVectorSize, const int* aCalibrationVectors[], const int aNormalizedVector[])
 {
@@ -130,6 +102,34 @@ bool DataNormalizer::configure(const byte aNumberOfSensors, BaseAnalogRead* aSen
 	
 	_StatusCode = S_OK;
 	return true;
+}
+
+//
+// Finds which segment the raw value lies in.
+//
+// < 0              - Below the segment values. 
+// 0.._VectorSize-1 - the segment index
+// >= _VectorSize   - the value lies above the segment values.
+//
+char DataNormalizer::FindPosition(int aValue, const int* aVector)
+{
+  byte i;
+  for(i=0; i<=_VectorSize; i++)
+    if(aValue <= aVector[i])
+      return i-1;
+  
+  return _VectorSize;
+}
+
+byte DataNormalizer::IndexOf(byte aPinNumber)
+{
+  if(_StatusCode != S_OK) return -1;
+
+  for(int i=0; i<_SensorCount; i++)
+    if(_Inputs[i]->PinNumber() == aPinNumber)
+      return i;
+
+  return -1;
 }
 
 bool DataNormalizer::Normalize()
