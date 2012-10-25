@@ -110,16 +110,15 @@ class DataNormalizer
     };
 
   public:
+    DataNormalizer() : _StatusCode(F_Uninitialized) {}
+
     //
     // aNumberOfSensors    - the number of sensors this object will track
-    // aSensorsToUse       - a list of Arduino analogue pin numbers to use
+    // aSensorReaders      - objects responsible for reading sensors
     //                     - This will determine the meaning of the indices
     //                       in the Values and Normalized arrays. 
     //                       This will allow the user to work with the concept
-    //                       of "sensor 0", "sensor 1", "sensor 2", etc. without
-    //                       needing to track the actual pin numbers through 
-    //                       the code, and allow the user to iterate through the 
-    //                       arrays with a for loop.
+    //                       of "sensor 0", "sensor 1", "sensor 2", etc. 
     // aVectorSize         - The number of elements in the calibration vectors 
     //                       and the normalized vector. 
     // aCalibrationVectors - An array of vectors that contain calibration data 
@@ -127,9 +126,8 @@ class DataNormalizer
     // aNormalizedVector   - A vector of values for the normalized portion of 
     //                       the calibration data.
     //
-    DataNormalizer(const byte aNumberOfSensors, const byte* aSensorsToUse, 
-                   const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
-    ~DataNormalizer();
+    bool configure(const byte aNumberOfSensors, BaseAnalogRead* aSensorReaders[], 
+                   const byte aVectorSize, const int* aCalibrationVectors[], const int aNormalizedVector[]);
 
     //
     // Contains the latest readings from the sensors. 
@@ -181,12 +179,10 @@ class DataNormalizer
     //
     bool ReadAndNormalize();
 
-    byte SensorCount();
-
-    bool setInputs(BaseAnalogRead* aInputs[]);
+    byte SensorCount() { return _SensorCount; }
 
     // Return the status of the object per the status codes above.
-    ErrorCodes StatusCode();
+    ErrorCodes StatusCode() { return _StatusCode; }
 
   private:
     // Perform compensation.
@@ -195,18 +191,7 @@ class DataNormalizer
     // Find the correct segment to use for interpolation.
     char FindPosition(int aValue, const int* aVector);
 
-    // Ensure that the data presented to the constructor makes sense,
-    // and set the status code appropriately.
-    bool Init(const byte aNumberOfSensors, const byte* aSensorsToUse, 
-              const byte aVectorSize, const int** aCalibrationVectors, const int* aNormalizedVector);
-
-    bool InitInputs();
-
     BaseAnalogRead* _Inputs[MAX_NUM_ANALOGUE_INPUTS];
-
-    bool _IOwnInputs;
-    
-    byte _Pins[MAX_NUM_ANALOGUE_INPUTS];
 
     // This is the number of sensors.
     byte _SensorCount;
