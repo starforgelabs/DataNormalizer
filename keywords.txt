@@ -1,6 +1,6 @@
-DataNormalizer KEYWORD1
-Read           KEYWORD2
-ErrorCode      KEYWORD3
-RawValue       KEYWORD4
-setRawValue    KEYWORD5
-Value          KEYWORD6
+DataNormalizer	KEYWORD1
+Read	KEYWORD2
+ErrorCode	KEYWORD3
+RawValue	KEYWORD4
+setRawValue	KEYWORD5
+Value	KEYWORD6
