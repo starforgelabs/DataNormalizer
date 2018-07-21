@@ -1,6 +1,12 @@
-DataNormalizer KEYWORD1
-Read           KEYWORD2
-ErrorCode      KEYWORD3
-RawValue       KEYWORD4
-setRawValue    KEYWORD5
-Value          KEYWORD6
+DataNormalizer	KEYWORD1
+
+configure	KEYWORD2
+IndexOf	KEYWORD2
+Normalize	KEYWORD2
+Read	KEYWORD2
+ReadAndNormalize	KEYWORD2
+SensorCount	KEYWORD2
+StatusCode	KEYWORD2
+
+Values	KEYWORD2
+Normalized	KEYWORD2
